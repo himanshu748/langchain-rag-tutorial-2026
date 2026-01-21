@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: langchain-rag-api
+    runtime: python
+    repo: https://github.com/himanshu748/langchain-rag-tutorial-2026
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false  # Must be set manually in Render dashboard
+      - key: PYTHON_VERSION
+        value: "3.11"
