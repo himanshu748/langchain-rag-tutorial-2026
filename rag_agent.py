@@ -97,6 +97,7 @@ class RAGAgent:
         self.db_path = "checkpoints.db"
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.checkpointer = SqliteSaver(self.conn)
+        self.checkpointer.setup()  # Create tables if they don't exist
         
         # Create simple agent (no memory - for single queries)
         self.simple_agent = create_agent(
