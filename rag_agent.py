@@ -4,6 +4,10 @@ LangChain v1.2.4 (January 2026)
 """
 
 import os
+
+# LangSmith Tracing - auto-enabled when LANGCHAIN_TRACING_V2=true
+if os.getenv("LANGCHAIN_TRACING_V2"):
+    print("✅ LangSmith tracing enabled - view traces at https://smith.langchain.com")
 from typing import Optional
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
