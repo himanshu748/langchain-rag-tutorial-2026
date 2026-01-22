@@ -13,6 +13,8 @@ services:
       # LangSmith Tracing (set in Render dashboard)
       - key: LANGSMITH_TRACING
         value: "true"
+      - key: LANGSMITH_ENDPOINT
+        value: "https://api.smith.langchain.com"
       - key: LANGSMITH_API_KEY
         sync: false  # Must be set manually in Render dashboard
       - key: LANGSMITH_PROJECT
