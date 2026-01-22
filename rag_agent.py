@@ -15,7 +15,8 @@ from langchain_core.documents import Document
 from langchain_core.tools import create_retriever_tool
 from langchain_core.messages import HumanMessage
 from langchain.agents import create_agent
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
+import sqlite3
 
 
 # Sample documents for demonstration
@@ -91,8 +92,11 @@ class RAGAgent:
             to find specific information from the documents."""
         )
         
-        # Memory saver for conversations
-        self.checkpointer = InMemorySaver()
+        # SQLite checkpointer for persistent conversations
+        # Each session_id (thread_id) has completely isolated conversation history
+        self.db_path = "checkpoints.db"
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self.checkpointer = SqliteSaver(self.conn)
         
         # Create simple agent (no memory - for single queries)
         self.simple_agent = create_agent(
@@ -141,6 +145,32 @@ class RAGAgent:
             }
             for doc in SAMPLE_DOCUMENTS
         ]
+
+    def clear_session(self, session_id: str) -> bool:
+        """Clear conversation history for a specific session."""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "DELETE FROM checkpoints WHERE thread_id = ?",
+                (session_id,)
+            )
+            cursor.execute(
+                "DELETE FROM writes WHERE thread_id = ?",
+                (session_id,)
+            )
+            self.conn.commit()
+            return True
+        except Exception:
+            return False
+
+    def list_sessions(self) -> list[str]:
+        """List all active session IDs."""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT DISTINCT thread_id FROM checkpoints")
+            return [row[0] for row in cursor.fetchall()]
+        except Exception:
+            return []
 
 
 # Singleton instance

@@ -217,6 +217,38 @@ async def list_documents():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.delete("/chat/conversation/{session_id}", tags=["Chat"])
+async def clear_session(session_id: str):
+    """
+    Clear conversation history for a specific session.
+    
+    Use this to reset a user's conversation context.
+    After clearing, the next message from this session will start fresh.
+    """
+    try:
+        agent = get_agent()
+        success = agent.clear_session(session_id)
+        if success:
+            return {"message": f"Session '{session_id}' cleared successfully"}
+        else:
+            raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found or could not be cleared")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/chat/sessions", tags=["Chat"])
+async def list_sessions():
+    """List all active session IDs (for debugging/admin purposes)."""
+    try:
+        agent = get_agent()
+        sessions = agent.list_sessions()
+        return {"sessions": sessions, "count": len(sessions)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
