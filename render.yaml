@@ -16,4 +16,4 @@ services:
       - key: LANGSMITH_API_KEY
         sync: false  # Must be set manually in Render dashboard
       - key: LANGSMITH_PROJECT
-        value: "langchain-rag-demo"
+        value: "demo"
