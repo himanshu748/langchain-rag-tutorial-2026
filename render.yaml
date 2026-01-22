@@ -11,9 +11,9 @@ services:
       - key: PYTHON_VERSION
         value: "3.11"
       # LangSmith Tracing (set in Render dashboard)
-      - key: LANGCHAIN_TRACING_V2
+      - key: LANGSMITH_TRACING
         value: "true"
-      - key: LANGCHAIN_API_KEY
+      - key: LANGSMITH_API_KEY
         sync: false  # Must be set manually in Render dashboard
-      - key: LANGCHAIN_PROJECT
+      - key: LANGSMITH_PROJECT
         value: "langchain-rag-demo"
