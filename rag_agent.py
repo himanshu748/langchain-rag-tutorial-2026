@@ -15,8 +15,9 @@ from langchain_core.documents import Document
 from langchain_core.tools import create_retriever_tool
 from langchain_core.messages import HumanMessage
 from langchain.agents import create_agent
-from langgraph.checkpoint.sqlite import SqliteSaver
-import sqlite3
+from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.memory import InMemorySaver
+import psycopg
 
 
 # Sample documents for demonstration
@@ -92,12 +93,27 @@ class RAGAgent:
             to find specific information from the documents."""
         )
         
-        # SQLite checkpointer for persistent conversations
+        # PostgreSQL checkpointer for persistent conversations
         # Each session_id (thread_id) has completely isolated conversation history
-        self.db_path = "checkpoints.db"
-        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
-        self.checkpointer = SqliteSaver(self.conn)
-        self.checkpointer.setup()  # Create tables if they don't exist
+        self.db_uri = os.getenv("DATABASE_URL")
+        self.checkpointer = None
+        self.pg_conn = None
+        
+        if self.db_uri:
+            try:
+                # Render uses postgres:// but psycopg needs postgresql://
+                db_uri = self.db_uri.replace("postgres://", "postgresql://")
+                self.pg_conn = psycopg.connect(db_uri, autocommit=True)
+                self.checkpointer = PostgresSaver(self.pg_conn)
+                self.checkpointer.setup()  # Create tables if they don't exist
+                print("✅ PostgreSQL checkpointer initialized")
+            except Exception as e:
+                print(f"⚠️ PostgreSQL connection failed: {e}")
+                print("   Falling back to InMemorySaver")
+                self.checkpointer = InMemorySaver()
+        else:
+            print("⚠️ DATABASE_URL not set - using InMemorySaver (no persistence)")
+            self.checkpointer = InMemorySaver()
         
         # Create simple agent (no memory - for single queries)
         self.simple_agent = create_agent(
@@ -149,25 +165,28 @@ class RAGAgent:
 
     def clear_session(self, session_id: str) -> bool:
         """Clear conversation history for a specific session."""
+        if not self.pg_conn:
+            return False
         try:
-            cursor = self.conn.cursor()
+            cursor = self.pg_conn.cursor()
             cursor.execute(
-                "DELETE FROM checkpoints WHERE thread_id = ?",
+                "DELETE FROM checkpoints WHERE thread_id = %s",
                 (session_id,)
             )
             cursor.execute(
-                "DELETE FROM writes WHERE thread_id = ?",
+                "DELETE FROM checkpoint_writes WHERE thread_id = %s",
                 (session_id,)
             )
-            self.conn.commit()
             return True
         except Exception:
             return False
 
     def list_sessions(self) -> list[str]:
         """List all active session IDs."""
+        if not self.pg_conn:
+            return []
         try:
-            cursor = self.conn.cursor()
+            cursor = self.pg_conn.cursor()
             cursor.execute("SELECT DISTINCT thread_id FROM checkpoints")
             return [row[0] for row in cursor.fetchall()]
         except Exception:
