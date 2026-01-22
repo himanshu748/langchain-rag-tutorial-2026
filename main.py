@@ -97,6 +97,7 @@ class HealthResponse(BaseModel):
     service: str
     version: str
     openai_configured: bool
+    langsmith_configured: bool
 
 
 class DocumentInfo(BaseModel):
@@ -142,8 +143,20 @@ async def health_check():
         status="healthy",
         service="LangChain RAG API",
         version="1.0.0",
-        openai_configured=bool(os.getenv("OPENAI_API_KEY"))
+        openai_configured=bool(os.getenv("OPENAI_API_KEY")),
+        langsmith_configured=bool(os.getenv("LANGSMITH_TRACING") and os.getenv("LANGSMITH_API_KEY"))
     )
+
+
+@app.get("/debug/langsmith", tags=["Debug"])
+async def debug_langsmith():
+    """Debug endpoint to verify LangSmith configuration."""
+    return {
+        "LANGSMITH_TRACING": os.getenv("LANGSMITH_TRACING", "NOT SET"),
+        "LANGSMITH_ENDPOINT": os.getenv("LANGSMITH_ENDPOINT", "NOT SET"),
+        "LANGSMITH_API_KEY": "SET" if os.getenv("LANGSMITH_API_KEY") else "NOT SET",
+        "LANGSMITH_PROJECT": os.getenv("LANGSMITH_PROJECT", "NOT SET"),
+    }
 
 
 @app.post("/chat", response_model=ChatResponse, tags=["Chat"])
