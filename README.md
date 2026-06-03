@@ -1,6 +1,6 @@
-# LangChain RAG Tutorial (Updated for v1.2.4 - January 2026)
+# LangChain RAG Tutorial API
 
-A comprehensive, production-ready RAG (Retrieval Augmented Generation) tutorial using the latest LangChain patterns.
+A FastAPI RAG (Retrieval Augmented Generation) tutorial using LangChain v1-style agents, Chroma, OpenAI embeddings, and optional conversation memory.
 
 ## ✨ What's New in This Update
 
@@ -17,8 +17,12 @@ A comprehensive, production-ready RAG (Retrieval Augmented Generation) tutorial 
 
 ### Option A: With OpenAI API
 ```bash
-pip install langchain langchain-openai langchain-chroma langgraph
-export OPENAI_API_KEY="your-key-here"
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+# Fill OPENAI_API_KEY in .env
+uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
 ### Option B: Fully Local (No API Key)
@@ -29,7 +33,7 @@ ollama pull llama3.2
 ollama pull nomic-embed-text
 ```
 
-Then set `USE_OLLAMA = True` in the notebook.
+Then use the notebook's Ollama path for local experimentation.
 
 ## 📦 Requirements
 
@@ -47,6 +51,26 @@ pip install -qU \
     pymupdf \
     pillow
 ```
+
+## Verification
+
+These checks do not require an OpenAI API key:
+
+```bash
+PYTHONPYCACHEPREFIX=/private/tmp/langchain-rag-pycache python3 -m compileall main.py rag_agent.py test_session_isolation.py
+pytest -q
+```
+
+## Runtime Configuration
+
+| Variable | Purpose |
+|---|---|
+| `OPENAI_API_KEY` | Required for `/chat`, `/chat/conversation`, and `/documents` |
+| `OPENAI_MODEL` | Chat model name, default `gpt-4o-mini` |
+| `DATABASE_URL` | Optional PostgreSQL checkpoint persistence |
+| `ALLOWED_ORIGINS` | Comma-separated CORS origins, defaults to localhost only |
+| `ENABLE_DEBUG_ENDPOINTS` | Enables `/debug/langsmith` and `/chat/sessions` when `true` |
+| `DEBUG_ERRORS` | Returns raw exception details when `true`; keep `false` in production |
 
 ## 🔑 Key API Patterns (v1.2.4)
 
@@ -78,8 +102,10 @@ answer = result["messages"][-1].content
 
 ## 📁 Files
 
-- `langchain_rag_tutorial_updated.ipynb` - Main tutorial notebook
-- `CHANGELOG.md` - Detailed list of all changes made
+- `main.py` - FastAPI app with lazy agent loading
+- `rag_agent.py` - LangChain RAG agent implementation
+- `test_session_isolation.py` - Local API tests that run without OpenAI credentials
+- `langchain_rag_tutorial_updated.ipynb` - Tutorial notebook
 
 ## 🧪 Tested With
 

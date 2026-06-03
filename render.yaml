@@ -10,6 +10,14 @@ services:
         sync: false  # Must be set manually in Render dashboard
       - key: PYTHON_VERSION
         value: "3.11"
+      - key: ALLOWED_ORIGINS
+        value: "https://your-frontend.example.com"
+      - key: ENABLE_DEBUG_ENDPOINTS
+        value: "false"
+      - key: DEBUG_ERRORS
+        value: "false"
+      - key: OPENAI_MODEL
+        value: "gpt-4o-mini"
       # LangSmith Tracing (set in Render dashboard)
       - key: LANGSMITH_TRACING
         value: "true"

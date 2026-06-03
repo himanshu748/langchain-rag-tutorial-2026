@@ -1,6 +1,6 @@
 """
 LangChain RAG Tutorial API
-FastAPI Application for demonstrating RAG with LangChain v1.2.4
+FastAPI application for demonstrating RAG with LangChain v1.x.
 
 Deploy on Render: https://render.com
 """
@@ -15,9 +15,19 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Verify OpenAI API key is set
-if not os.getenv("OPENAI_API_KEY"):
-    print("⚠️  Warning: OPENAI_API_KEY not set. Set it before making queries.")
+def env_flag(name: str, default: bool = False) -> bool:
+    """Parse common truthy environment variable values."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def get_allowed_origins() -> list[str]:
+    """Return explicit CORS origins from ALLOWED_ORIGINS."""
+    raw = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return origins or ["http://localhost:3000", "http://127.0.0.1:3000"]
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -47,8 +57,8 @@ Based on [FutureSmart.ai RAG Tutorial](https://blog.futuresmart.ai/langchain-rag
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=get_allowed_origins(),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -98,6 +108,7 @@ class HealthResponse(BaseModel):
     version: str
     openai_configured: bool
     langsmith_configured: bool
+    debug_endpoints_enabled: bool
 
 
 class DocumentInfo(BaseModel):
@@ -119,6 +130,20 @@ def get_agent():
     return _agent
 
 
+def require_openai_key() -> None:
+    if not os.getenv("OPENAI_API_KEY"):
+        raise HTTPException(
+            status_code=503,
+            detail="OpenAI API key is not configured. Set OPENAI_API_KEY before making RAG queries.",
+        )
+
+
+def internal_error(exc: Exception) -> HTTPException:
+    if env_flag("DEBUG_ERRORS"):
+        return HTTPException(status_code=500, detail=str(exc))
+    return HTTPException(status_code=500, detail="RAG request failed. Check server logs for details.")
+
+
 # Endpoints
 @app.get("/", tags=["Info"])
 async def root():
@@ -130,7 +155,6 @@ async def root():
         "endpoints": {
             "health": "/health",
             "chat": "/chat",
-            "conversation": "/chat/conversation",
             "documents": "/documents"
         }
     }
@@ -144,13 +168,16 @@ async def health_check():
         service="LangChain RAG API",
         version="1.0.0",
         openai_configured=bool(os.getenv("OPENAI_API_KEY")),
-        langsmith_configured=bool(os.getenv("LANGSMITH_TRACING") and os.getenv("LANGSMITH_API_KEY"))
+        langsmith_configured=bool(os.getenv("LANGSMITH_TRACING") and os.getenv("LANGSMITH_API_KEY")),
+        debug_endpoints_enabled=env_flag("ENABLE_DEBUG_ENDPOINTS"),
     )
 
 
 @app.get("/debug/langsmith", tags=["Debug"])
 async def debug_langsmith():
     """Debug endpoint to verify LangSmith configuration."""
+    if not env_flag("ENABLE_DEBUG_ENDPOINTS"):
+        raise HTTPException(status_code=404, detail="Not found")
     return {
         "LANGSMITH_TRACING": os.getenv("LANGSMITH_TRACING", "NOT SET"),
         "LANGSMITH_ENDPOINT": os.getenv("LANGSMITH_ENDPOINT", "NOT SET"),
@@ -167,18 +194,14 @@ async def chat(request: ChatRequest):
     Send a question and get an answer based on the knowledge base.
     This endpoint does NOT maintain conversation history.
     """
-    if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(
-            status_code=503,
-            detail="OpenAI API key not configured. Set OPENAI_API_KEY environment variable."
-        )
+    require_openai_key()
     
     try:
         agent = get_agent()
         answer = agent.query(request.question)
         return ChatResponse(answer=answer)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_error(e)
 
 
 @app.post("/chat/conversation", response_model=ChatResponse, tags=["Chat"])
@@ -193,28 +216,25 @@ async def conversation(request: ConversationRequest):
     1. {"question": "What is LangChain?", "session_id": "user-123"}
     2. {"question": "How does it work?", "session_id": "user-123"}  # Remembers context
     """
-    if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(
-            status_code=503,
-            detail="OpenAI API key not configured. Set OPENAI_API_KEY environment variable."
-        )
+    require_openai_key()
     
     try:
         agent = get_agent()
         answer = agent.chat(request.question, request.session_id)
         return ChatResponse(answer=answer, session_id=request.session_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_error(e)
 
 
 @app.get("/documents", response_model=list[DocumentInfo], tags=["Knowledge Base"])
 async def list_documents():
     """List all documents in the knowledge base."""
+    require_openai_key()
     try:
         agent = get_agent()
         return agent.get_documents()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_error(e)
 
 
 @app.delete("/chat/conversation/{session_id}", tags=["Chat"])
@@ -235,20 +255,22 @@ async def clear_session(session_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_error(e)
 
 
 @app.get("/chat/sessions", tags=["Chat"])
 async def list_sessions():
     """List all active session IDs (for debugging/admin purposes)."""
+    if not env_flag("ENABLE_DEBUG_ENDPOINTS"):
+        raise HTTPException(status_code=404, detail="Not found")
     try:
         agent = get_agent()
         sessions = agent.list_sessions()
         return {"sessions": sessions, "count": len(sessions)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_error(e)
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)

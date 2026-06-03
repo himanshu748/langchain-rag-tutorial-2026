@@ -1,6 +1,6 @@
 """
 RAG Agent Module - Extracted from LangChain RAG Tutorial
-LangChain v1.2.4 (January 2026)
+LangChain v1.x tutorial implementation.
 """
 
 import os
@@ -69,7 +69,7 @@ class RAGAgent:
     def __init__(self):
         """Initialize the RAG agent with vector store and tools."""
         # Initialize LLM
-        self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        self.llm = ChatOpenAI(model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), temperature=0)
         
         # Initialize embeddings and vector store
         self.embeddings = OpenAIEmbeddings()
@@ -107,8 +107,8 @@ class RAGAgent:
                 self.checkpointer = PostgresSaver(self.pg_conn)
                 self.checkpointer.setup()  # Create tables if they don't exist
                 print("✅ PostgreSQL checkpointer initialized")
-            except Exception as e:
-                print(f"⚠️ PostgreSQL connection failed: {e}")
+            except Exception:
+                print("⚠️ PostgreSQL connection failed")
                 print("   Falling back to InMemorySaver")
                 self.checkpointer = InMemorySaver()
         else:
@@ -166,6 +166,9 @@ class RAGAgent:
     def clear_session(self, session_id: str) -> bool:
         """Clear conversation history for a specific session."""
         if not self.pg_conn:
+            if hasattr(self.checkpointer, "storage"):
+                self.checkpointer.storage.pop(session_id, None)
+                return True
             return False
         try:
             cursor = self.pg_conn.cursor()
