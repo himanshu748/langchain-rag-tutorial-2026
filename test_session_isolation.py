@@ -3,6 +3,7 @@
 
 from fastapi.testclient import TestClient
 
+import main
 from main import app
 
 
@@ -40,3 +41,53 @@ def test_request_validation_rejects_empty_question():
     response = client.post("/chat", json={"question": ""})
 
     assert response.status_code == 422
+
+
+def test_blank_question_is_rejected_before_agent_call(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    response = client.post("/chat", json={"question": "   "})
+
+    assert response.status_code == 422
+    assert "blank" in response.json()["detail"]
+
+
+def test_conversation_rejects_unsafe_session_id(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    response = client.post(
+        "/chat/conversation",
+        json={"question": "What is RAG?", "session_id": "../shared"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_agent_errors_are_sanitized_by_default(monkeypatch):
+    class FailingAgent:
+        def query(self, question):
+            raise RuntimeError("raw provider secret detail")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.delenv("DEBUG_ERRORS", raising=False)
+    monkeypatch.setattr(main, "_agent", FailingAgent())
+
+    response = client.post("/chat", json={"question": "What is RAG?"})
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "RAG request failed. Check server logs for details."
+
+
+def test_clear_session_requires_openai_key(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.delete("/chat/conversation/default")
+
+    assert response.status_code == 503
+    assert "OPENAI_API_KEY" in response.json()["detail"]
+
+
+def test_allowed_origins_rejects_wildcards(monkeypatch):
+    monkeypatch.setenv("ALLOWED_ORIGINS", "*,https://app.example.com")
+
+    assert main.get_allowed_origins() == ["https://app.example.com"]

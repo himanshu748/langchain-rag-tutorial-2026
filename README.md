@@ -68,9 +68,17 @@ pytest -q
 | `OPENAI_API_KEY` | Required for `/chat`, `/chat/conversation`, and `/documents` |
 | `OPENAI_MODEL` | Chat model name, default `gpt-4o-mini` |
 | `DATABASE_URL` | Optional PostgreSQL checkpoint persistence |
-| `ALLOWED_ORIGINS` | Comma-separated CORS origins, defaults to localhost only |
+| `ALLOWED_ORIGINS` | Comma-separated explicit HTTP(S) CORS origins, defaults to localhost only; wildcard origins are ignored |
 | `ENABLE_DEBUG_ENDPOINTS` | Enables `/debug/langsmith` and `/chat/sessions` when `true` |
 | `DEBUG_ERRORS` | Returns raw exception details when `true`; keep `false` in production |
+
+## Safety Defaults
+
+- Health checks and local tests run without `OPENAI_API_KEY` or LangChain imports.
+- RAG endpoints return `503` until `OPENAI_API_KEY` is configured.
+- Backend/provider exceptions are hidden by default; set `DEBUG_ERRORS=true` only in trusted local debugging.
+- Conversation `session_id` values are bounded and limited to letters, numbers, dots, underscores, colons, and hyphens.
+- Debug/admin endpoints stay hidden unless `ENABLE_DEBUG_ENDPOINTS=true`.
 
 ## 🔑 Key API Patterns (v1.2.4)
 

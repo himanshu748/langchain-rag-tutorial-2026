@@ -10,10 +10,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional
 import os
+import re
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+DEFAULT_ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+MAX_QUESTION_CHARS = 4_000
+MAX_SESSION_ID_CHARS = 96
+SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$")
+
 
 def env_flag(name: str, default: bool = False) -> bool:
     """Parse common truthy environment variable values."""
@@ -25,9 +32,35 @@ def env_flag(name: str, default: bool = False) -> bool:
 
 def get_allowed_origins() -> list[str]:
     """Return explicit CORS origins from ALLOWED_ORIGINS."""
-    raw = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+    raw = os.getenv("ALLOWED_ORIGINS", ",".join(DEFAULT_ALLOWED_ORIGINS))
     origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
-    return origins or ["http://localhost:3000", "http://127.0.0.1:3000"]
+    safe_origins = [
+        origin
+        for origin in origins
+        if origin != "*" and origin.startswith(("http://", "https://"))
+    ]
+    return safe_origins or DEFAULT_ALLOWED_ORIGINS
+
+
+def validate_session_id(session_id: str) -> str:
+    """Validate and normalize session IDs before they reach checkpoint storage."""
+    normalized = session_id.strip()
+    if not SESSION_ID_PATTERN.fullmatch(normalized):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "session_id must start with a letter or number and contain only "
+                "letters, numbers, dots, underscores, colons, or hyphens."
+            ),
+        )
+    return normalized
+
+
+def sanitize_question(question: str) -> str:
+    normalized = question.strip()
+    if not normalized:
+        raise HTTPException(status_code=422, detail="question must not be blank")
+    return normalized
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -67,7 +100,12 @@ app.add_middleware(
 # Request/Response models
 class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
-    question: str = Field(..., description="The question to ask the RAG agent", min_length=1)
+    question: str = Field(
+        ...,
+        description="The question to ask the RAG agent",
+        min_length=1,
+        max_length=MAX_QUESTION_CHARS,
+    )
     
     model_config = {
         "json_schema_extra": {
@@ -82,8 +120,19 @@ class ChatRequest(BaseModel):
 
 class ConversationRequest(BaseModel):
     """Request model for conversation endpoint with session tracking."""
-    question: str = Field(..., description="The question to ask", min_length=1)
-    session_id: str = Field(default="default", description="Session ID for conversation memory")
+    question: str = Field(
+        ...,
+        description="The question to ask",
+        min_length=1,
+        max_length=MAX_QUESTION_CHARS,
+    )
+    session_id: str = Field(
+        default="default",
+        description="Session ID for conversation memory",
+        min_length=1,
+        max_length=MAX_SESSION_ID_CHARS,
+        pattern=SESSION_ID_PATTERN.pattern,
+    )
     
     model_config = {
         "json_schema_extra": {
@@ -155,6 +204,7 @@ async def root():
         "endpoints": {
             "health": "/health",
             "chat": "/chat",
+            "conversation": "/chat/conversation",
             "documents": "/documents"
         }
     }
@@ -195,10 +245,11 @@ async def chat(request: ChatRequest):
     This endpoint does NOT maintain conversation history.
     """
     require_openai_key()
+    question = sanitize_question(request.question)
     
     try:
         agent = get_agent()
-        answer = agent.query(request.question)
+        answer = agent.query(question)
         return ChatResponse(answer=answer)
     except Exception as e:
         raise internal_error(e)
@@ -217,11 +268,13 @@ async def conversation(request: ConversationRequest):
     2. {"question": "How does it work?", "session_id": "user-123"}  # Remembers context
     """
     require_openai_key()
+    question = sanitize_question(request.question)
+    session_id = validate_session_id(request.session_id)
     
     try:
         agent = get_agent()
-        answer = agent.chat(request.question, request.session_id)
-        return ChatResponse(answer=answer, session_id=request.session_id)
+        answer = agent.chat(question, session_id)
+        return ChatResponse(answer=answer, session_id=session_id)
     except Exception as e:
         raise internal_error(e)
 
@@ -245,7 +298,9 @@ async def clear_session(session_id: str):
     Use this to reset a user's conversation context.
     After clearing, the next message from this session will start fresh.
     """
+    require_openai_key()
     try:
+        session_id = validate_session_id(session_id)
         agent = get_agent()
         success = agent.clear_session(session_id)
         if success:

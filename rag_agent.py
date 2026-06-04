@@ -132,25 +132,19 @@ class RAGAgent:
     
     def query(self, question: str) -> str:
         """Single-turn query without memory."""
-        try:
-            response = self.simple_agent.invoke({
-                "messages": [HumanMessage(content=question)]
-            })
-            return response["messages"][-1].content
-        except Exception as e:
-            return f"Error processing query: {str(e)}"
+        response = self.simple_agent.invoke({
+            "messages": [HumanMessage(content=question)]
+        })
+        return response["messages"][-1].content
     
     def chat(self, question: str, session_id: str = "default") -> str:
         """Multi-turn conversation with memory."""
-        try:
-            config = {"configurable": {"thread_id": session_id}}
-            response = self.conversational_agent.invoke(
-                {"messages": [HumanMessage(content=question)]},
-                config=config
-            )
-            return response["messages"][-1].content
-        except Exception as e:
-            return f"Error processing query: {str(e)}"
+        config = {"configurable": {"thread_id": session_id}}
+        response = self.conversational_agent.invoke(
+            {"messages": [HumanMessage(content=question)]},
+            config=config
+        )
+        return response["messages"][-1].content
     
     def get_documents(self) -> list[dict]:
         """Return list of documents in the knowledge base."""

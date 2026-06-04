@@ -13,4 +13,5 @@ This repository is a LangChain/FastAPI RAG tutorial and demo API. Keep it safe t
 - Keep FastAPI import and health checks working without LangChain packages or `OPENAI_API_KEY`; heavy RAG imports should stay lazy.
 - Gate debug/admin endpoints behind `ENABLE_DEBUG_ENDPOINTS=true`.
 - Keep CORS explicit via `ALLOWED_ORIGINS`; avoid wildcard origins for deployed services.
+- Keep request validation strict: bound question length, validate session IDs, and do not return raw provider/backend errors unless `DEBUG_ERRORS=true`.
 - Prefer local API tests over tests that hit Render or other external deployments.
