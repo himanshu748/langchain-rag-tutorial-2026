@@ -5,8 +5,11 @@ LangChain v1.x tutorial implementation.
 
 import os
 
+from env_utils import env_flag
+
+
 # LangSmith Tracing - auto-enabled when LANGSMITH_TRACING=true
-if os.getenv("LANGSMITH_TRACING"):
+if env_flag("LANGSMITH_TRACING"):
     print("✅ LangSmith tracing enabled - view traces at https://smith.langchain.com")
 from typing import Optional
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings

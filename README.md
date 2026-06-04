@@ -57,7 +57,7 @@ pip install -qU \
 These checks do not require an OpenAI API key:
 
 ```bash
-PYTHONPYCACHEPREFIX=/private/tmp/langchain-rag-pycache python3 -m compileall main.py rag_agent.py knowledge_base.py test_session_isolation.py
+PYTHONPYCACHEPREFIX=/private/tmp/langchain-rag-pycache python3 -m compileall main.py rag_agent.py knowledge_base.py env_utils.py test_session_isolation.py
 pytest -q
 ```
 

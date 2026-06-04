@@ -12,6 +12,7 @@ from typing import Optional
 import os
 import re
 from dotenv import load_dotenv
+from env_utils import env_flag
 from knowledge_base import list_sample_documents
 
 # Load environment variables
@@ -26,14 +27,6 @@ SECRET_PATTERN = re.compile(
     r"\b(?:sk-[A-Za-z0-9_-]{8,}|hf_[A-Za-z0-9]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|AIza[A-Za-z0-9_-]{8,})\b"
 )
 LOCAL_PATH_PATTERN = re.compile(r"(?:/private|/Users|/var|/tmp)/[^\s'\"<>]+")
-
-
-def env_flag(name: str, default: bool = False) -> bool:
-    """Parse common truthy environment variable values."""
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def env_has_value(name: str) -> bool:

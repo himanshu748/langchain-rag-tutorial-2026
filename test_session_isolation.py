@@ -3,6 +3,7 @@
 
 from fastapi.testclient import TestClient
 
+from env_utils import env_flag as rag_env_flag
 import main
 from main import app
 
@@ -193,3 +194,11 @@ def test_allowed_origins_rejects_wildcards(monkeypatch):
     monkeypatch.setenv("ALLOWED_ORIGINS", "*,https://app.example.com")
 
     assert main.get_allowed_origins() == ["https://app.example.com"]
+
+
+def test_rag_agent_langsmith_flag_uses_truthy_values(monkeypatch):
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    assert rag_env_flag("LANGSMITH_TRACING") is False
+
+    monkeypatch.setenv("LANGSMITH_TRACING", "on")
+    assert rag_env_flag("LANGSMITH_TRACING") is True
