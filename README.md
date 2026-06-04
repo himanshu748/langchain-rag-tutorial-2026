@@ -70,14 +70,14 @@ pytest -q
 | `DATABASE_URL` | Optional PostgreSQL checkpoint persistence |
 | `ALLOWED_ORIGINS` | Comma-separated explicit HTTP(S) CORS origins, defaults to localhost only; wildcard origins are ignored |
 | `ENABLE_DEBUG_ENDPOINTS` | Enables `/debug/langsmith` and `/chat/sessions` when `true` |
-| `DEBUG_ERRORS` | Returns raw exception details when `true`; keep `false` in production |
+| `DEBUG_ERRORS` | Returns redacted, truncated exception details when `true`; keep `false` in production |
 
 ## Safety Defaults
 
 - Health checks and local tests run without `OPENAI_API_KEY` or LangChain imports.
 - `/documents` returns the built-in tutorial corpus without initializing the RAG agent or requiring provider credentials.
 - RAG endpoints return `503` until `OPENAI_API_KEY` is configured.
-- Backend/provider exceptions are hidden by default; set `DEBUG_ERRORS=true` only in trusted local debugging.
+- Backend/provider exceptions are hidden by default; set `DEBUG_ERRORS=true` only in trusted local debugging. Debug details are still redacted and truncated.
 - Conversation `session_id` values are bounded and limited to letters, numbers, dots, underscores, colons, and hyphens.
 - Debug/admin endpoints stay hidden unless `ENABLE_DEBUG_ENDPOINTS=true`.
 

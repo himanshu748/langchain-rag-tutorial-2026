@@ -20,7 +20,12 @@ load_dotenv()
 DEFAULT_ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 MAX_QUESTION_CHARS = 4_000
 MAX_SESSION_ID_CHARS = 96
+MAX_DEBUG_ERROR_CHARS = 240
 SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$")
+SECRET_PATTERN = re.compile(
+    r"\b(?:sk-[A-Za-z0-9_-]{8,}|hf_[A-Za-z0-9]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|AIza[A-Za-z0-9_-]{8,})\b"
+)
+LOCAL_PATH_PATTERN = re.compile(r"(?:/private|/Users|/var|/tmp)/[^\s'\"<>]+")
 
 
 def env_flag(name: str, default: bool = False) -> bool:
@@ -190,7 +195,11 @@ def require_openai_key() -> None:
 
 def internal_error(exc: Exception) -> HTTPException:
     if env_flag("DEBUG_ERRORS"):
-        return HTTPException(status_code=500, detail=str(exc))
+        detail = SECRET_PATTERN.sub("[redacted-secret]", str(exc))
+        detail = LOCAL_PATH_PATTERN.sub("[redacted-path]", detail)
+        if len(detail) > MAX_DEBUG_ERROR_CHARS:
+            detail = detail[:MAX_DEBUG_ERROR_CHARS] + "...[truncated]"
+        return HTTPException(status_code=500, detail=detail)
     return HTTPException(status_code=500, detail="RAG request failed. Check server logs for details.")
 
 

@@ -89,7 +89,7 @@ def test_conversation_rejects_unsafe_session_id(monkeypatch):
 def test_agent_errors_are_sanitized_by_default(monkeypatch):
     class FailingAgent:
         def query(self, question):
-            raise RuntimeError("raw provider secret detail")
+            raise RuntimeError("raw provider secret detail sk-test-secret-value")
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.delenv("DEBUG_ERRORS", raising=False)
@@ -99,6 +99,63 @@ def test_agent_errors_are_sanitized_by_default(monkeypatch):
 
     assert response.status_code == 500
     assert response.json()["detail"] == "RAG request failed. Check server logs for details."
+
+
+def test_debug_agent_errors_are_redacted(monkeypatch):
+    class FailingAgent:
+        def query(self, question):
+            raise RuntimeError(
+                "provider failed with sk-1234567890abcdef at /private/tmp/vector-store"
+            )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("DEBUG_ERRORS", "true")
+    monkeypatch.setattr(main, "_agent", FailingAgent())
+
+    response = client.post("/chat", json={"question": "What is RAG?"})
+
+    assert response.status_code == 500
+    detail = response.json()["detail"]
+    assert "[redacted-secret]" in detail
+    assert "[redacted-path]" in detail
+    assert "sk-1234567890abcdef" not in detail
+    assert "/private/tmp" not in detail
+
+
+def test_debug_agent_errors_are_truncated(monkeypatch):
+    class FailingAgent:
+        def query(self, question):
+            raise RuntimeError("x" * (main.MAX_DEBUG_ERROR_CHARS + 80))
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("DEBUG_ERRORS", "true")
+    monkeypatch.setattr(main, "_agent", FailingAgent())
+
+    response = client.post("/chat", json={"question": "What is RAG?"})
+
+    assert response.status_code == 500
+    detail = response.json()["detail"]
+    assert detail.endswith("...[truncated]")
+    assert len(detail) == main.MAX_DEBUG_ERROR_CHARS + len("...[truncated]")
+
+
+def test_debug_sessions_errors_are_redacted(monkeypatch):
+    class FailingAgent:
+        def list_sessions(self):
+            raise RuntimeError("session store leaked hf_abcdefghijklmnop at /Users/demo/db")
+
+    monkeypatch.setenv("ENABLE_DEBUG_ENDPOINTS", "true")
+    monkeypatch.setenv("DEBUG_ERRORS", "true")
+    monkeypatch.setattr(main, "_agent", FailingAgent())
+
+    response = client.get("/chat/sessions")
+
+    assert response.status_code == 500
+    detail = response.json()["detail"]
+    assert "[redacted-secret]" in detail
+    assert "[redacted-path]" in detail
+    assert "hf_abcdefghijklmnop" not in detail
+    assert "/Users/demo" not in detail
 
 
 def test_clear_session_requires_openai_key(monkeypatch):
