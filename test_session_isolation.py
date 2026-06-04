@@ -30,6 +30,28 @@ def test_chat_requires_openai_key(monkeypatch):
     assert "OPENAI_API_KEY" in response.json()["detail"]
 
 
+def test_chat_rejects_blank_openai_key(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "   ")
+
+    response = client.post("/chat", json={"question": "What is RAG?"})
+
+    assert response.status_code == 503
+    assert "OPENAI_API_KEY" in response.json()["detail"]
+
+
+def test_health_treats_blank_provider_keys_as_unconfigured(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "   ")
+    monkeypatch.setenv("LANGSMITH_TRACING", "true")
+    monkeypatch.setenv("LANGSMITH_API_KEY", "   ")
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["openai_configured"] is False
+    assert payload["langsmith_configured"] is False
+
+
 def test_documents_are_available_without_openai_key(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 

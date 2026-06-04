@@ -36,6 +36,11 @@ def env_flag(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def env_has_value(name: str) -> bool:
+    """Return True only when an environment variable has non-blank content."""
+    return bool(os.getenv(name, "").strip())
+
+
 def get_allowed_origins() -> list[str]:
     """Return explicit CORS origins from ALLOWED_ORIGINS."""
     raw = os.getenv("ALLOWED_ORIGINS", ",".join(DEFAULT_ALLOWED_ORIGINS))
@@ -186,7 +191,7 @@ def get_agent():
 
 
 def require_openai_key() -> None:
-    if not os.getenv("OPENAI_API_KEY"):
+    if not env_has_value("OPENAI_API_KEY"):
         raise HTTPException(
             status_code=503,
             detail="OpenAI API key is not configured. Set OPENAI_API_KEY before making RAG queries.",
@@ -227,8 +232,9 @@ async def health_check():
         status="healthy",
         service="LangChain RAG API",
         version="1.0.0",
-        openai_configured=bool(os.getenv("OPENAI_API_KEY")),
-        langsmith_configured=bool(os.getenv("LANGSMITH_TRACING") and os.getenv("LANGSMITH_API_KEY")),
+        openai_configured=env_has_value("OPENAI_API_KEY"),
+        langsmith_configured=env_flag("LANGSMITH_TRACING")
+        and env_has_value("LANGSMITH_API_KEY"),
         debug_endpoints_enabled=env_flag("ENABLE_DEBUG_ENDPOINTS"),
     )
 
