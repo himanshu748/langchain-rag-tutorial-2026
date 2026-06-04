@@ -12,6 +12,7 @@ from typing import Optional
 import os
 import re
 from dotenv import load_dotenv
+from knowledge_base import list_sample_documents
 
 # Load environment variables
 load_dotenv()
@@ -281,13 +282,8 @@ async def conversation(request: ConversationRequest):
 
 @app.get("/documents", response_model=list[DocumentInfo], tags=["Knowledge Base"])
 async def list_documents():
-    """List all documents in the knowledge base."""
-    require_openai_key()
-    try:
-        agent = get_agent()
-        return agent.get_documents()
-    except Exception as e:
-        raise internal_error(e)
+    """List all built-in tutorial documents without requiring provider credentials."""
+    return list_sample_documents(truncate=False)
 
 
 @app.delete("/chat/conversation/{session_id}", tags=["Chat"])

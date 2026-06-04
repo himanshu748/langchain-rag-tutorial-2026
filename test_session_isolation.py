@@ -30,6 +30,29 @@ def test_chat_requires_openai_key(monkeypatch):
     assert "OPENAI_API_KEY" in response.json()["detail"]
 
 
+def test_documents_are_available_without_openai_key(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.get("/documents")
+
+    assert response.status_code == 200
+    documents = response.json()
+    assert len(documents) == 7
+    assert documents[0]["source"] == "langchain_intro.txt"
+
+
+def test_documents_do_not_initialize_agent(monkeypatch):
+    def fail_agent_load():
+        raise AssertionError("documents endpoint should not initialize the RAG agent")
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(main, "get_agent", fail_agent_load)
+
+    response = client.get("/documents")
+
+    assert response.status_code == 200
+
+
 def test_debug_endpoints_are_hidden_by_default(monkeypatch):
     monkeypatch.delenv("ENABLE_DEBUG_ENDPOINTS", raising=False)
 

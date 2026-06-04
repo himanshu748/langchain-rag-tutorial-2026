@@ -18,38 +18,16 @@ from langchain.agents import create_agent
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.memory import InMemorySaver
 import psycopg
+from knowledge_base import SAMPLE_KNOWLEDGE_BASE, list_sample_documents
 
 
 # Sample documents for demonstration
 SAMPLE_DOCUMENTS = [
     Document(
-        page_content="LangChain is a framework for developing applications powered by language models. It provides tools for prompt management, chains, and agents.",
-        metadata={"source": "langchain_intro.txt", "page": 1}
-    ),
-    Document(
-        page_content="RAG (Retrieval Augmented Generation) combines retrieval and generation to produce more accurate and up-to-date responses. It works by retrieving relevant documents from a knowledge base.",
-        metadata={"source": "rag_overview.txt", "page": 1}
-    ),
-    Document(
-        page_content="Vector databases store data as high-dimensional vectors, enabling similarity search. Popular options include Chroma, Pinecone, and Weaviate.",
-        metadata={"source": "vector_db.txt", "page": 1}
-    ),
-    Document(
-        page_content="Embeddings are numerical representations of text that capture semantic meaning. OpenAI embeddings and sentence-transformers are commonly used.",
-        metadata={"source": "embeddings.txt", "page": 1}
-    ),
-    Document(
-        page_content="LangGraph is a library for building stateful, multi-actor applications. It powers LangChain's agent framework with features like persistence and streaming.",
-        metadata={"source": "langgraph.txt", "page": 1}
-    ),
-    Document(
-        page_content="The create_agent function from langchain.agents is the modern way to build agents in LangChain v1.2+. It provides a simple interface with system prompts and tool integration.",
-        metadata={"source": "create_agent.txt", "page": 1}
-    ),
-    Document(
-        page_content="InMemorySaver from langgraph.checkpoint.memory enables conversation persistence. Each thread_id maintains separate conversation history for multi-user support.",
-        metadata={"source": "memory.txt", "page": 1}
-    ),
+        page_content=document["content"],
+        metadata={"source": document["source"], "page": document["page"]},
+    )
+    for document in SAMPLE_KNOWLEDGE_BASE
 ]
 
 RAG_SYSTEM_PROMPT = """You are a helpful AI assistant with access to a knowledge base about LangChain, RAG, and related technologies.
@@ -148,14 +126,7 @@ class RAGAgent:
     
     def get_documents(self) -> list[dict]:
         """Return list of documents in the knowledge base."""
-        return [
-            {
-                "content": doc.page_content[:100] + "..." if len(doc.page_content) > 100 else doc.page_content,
-                "source": doc.metadata.get("source", "unknown"),
-                "page": doc.metadata.get("page", 1)
-            }
-            for doc in SAMPLE_DOCUMENTS
-        ]
+        return list_sample_documents(truncate=True)
 
     def clear_session(self, session_id: str) -> bool:
         """Clear conversation history for a specific session."""

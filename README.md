@@ -57,7 +57,7 @@ pip install -qU \
 These checks do not require an OpenAI API key:
 
 ```bash
-PYTHONPYCACHEPREFIX=/private/tmp/langchain-rag-pycache python3 -m compileall main.py rag_agent.py test_session_isolation.py
+PYTHONPYCACHEPREFIX=/private/tmp/langchain-rag-pycache python3 -m compileall main.py rag_agent.py knowledge_base.py test_session_isolation.py
 pytest -q
 ```
 
@@ -65,7 +65,7 @@ pytest -q
 
 | Variable | Purpose |
 |---|---|
-| `OPENAI_API_KEY` | Required for `/chat`, `/chat/conversation`, and `/documents` |
+| `OPENAI_API_KEY` | Required for `/chat`, `/chat/conversation`, and clearing conversation sessions |
 | `OPENAI_MODEL` | Chat model name, default `gpt-4o-mini` |
 | `DATABASE_URL` | Optional PostgreSQL checkpoint persistence |
 | `ALLOWED_ORIGINS` | Comma-separated explicit HTTP(S) CORS origins, defaults to localhost only; wildcard origins are ignored |
@@ -75,6 +75,7 @@ pytest -q
 ## Safety Defaults
 
 - Health checks and local tests run without `OPENAI_API_KEY` or LangChain imports.
+- `/documents` returns the built-in tutorial corpus without initializing the RAG agent or requiring provider credentials.
 - RAG endpoints return `503` until `OPENAI_API_KEY` is configured.
 - Backend/provider exceptions are hidden by default; set `DEBUG_ERRORS=true` only in trusted local debugging.
 - Conversation `session_id` values are bounded and limited to letters, numbers, dots, underscores, colons, and hyphens.
@@ -111,6 +112,7 @@ answer = result["messages"][-1].content
 ## 📁 Files
 
 - `main.py` - FastAPI app with lazy agent loading
+- `knowledge_base.py` - Built-in tutorial corpus shared by the API and RAG agent
 - `rag_agent.py` - LangChain RAG agent implementation
 - `test_session_isolation.py` - Local API tests that run without OpenAI credentials
 - `langchain_rag_tutorial_updated.ipynb` - Tutorial notebook
